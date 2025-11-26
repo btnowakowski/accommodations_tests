@@ -1,3 +1,10 @@
 .pytest_cache
 .vscode
-/source/__pycache__
+__pycache__
+.venv
+.env
+*.env
+allure-results
+allure-report
+videos/
+artifacts/
