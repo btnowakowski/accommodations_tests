@@ -1,5 +1,11 @@
 # service_booking_platform_tests
 
+## Tech Stack
+- Python
+- Playwright
+- Pytest
+- Allure
+
 ## E2E Test Report - Github Actions, Github Pages, Allure
 
 Latest Report: [Check it out](https://btnowakowski.github.io/service-booking-platform-tests/)
