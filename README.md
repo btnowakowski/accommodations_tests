@@ -1,15 +1,15 @@
 # service_booking_platform_tests
 
-## Raport testów E2E - Github Actions, Github Pages, Allure
+## E2E Test Report - Github Actions, Github Pages, Allure
 
-Aktualny raport: [zobacz tutaj](https://btnowakowski.github.io/service-booking-platform-tests/)
+Latest Report: [zobacz tutaj](https://btnowakowski.github.io/service-booking-platform-tests/)
 
-## Uruchamianie testów lokalnie
+## Running tests locally
 
-Domyślnie testy odpalają się przeciwko lokalnej instancji (`http://127.0.0.1:8000`).
+By default set to run on (`http://127.0.0.1:8000`).
 
-1. Uruchom aplikację lokalnie ([Skorzystaj z README w repozytorium aplikacji](https://github.com/btnowakowski/service-booking-platform)).
-2. Uruchom testy i otwórz raport za pomocą poleceń:
+1. Get the app to run locally ([Use README of the Booking Platform](https://github.com/btnowakowski/service-booking-platform)).
+2. Run tests and generate your report using:
 
 ```bash
 pytest
