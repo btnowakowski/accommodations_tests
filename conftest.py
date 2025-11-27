@@ -18,6 +18,12 @@ SCREENSHOTS_DIR.mkdir(parents=True, exist_ok=True)
 VIDEOS_DIR.mkdir(parents=True, exist_ok=True)
 
 
+@pytest.fixture(scope="session", autouse=True)
+def setup_timezone():
+    """Ustaw strefę czasową dla testów."""
+    os.environ["TZ"] = "Europe/Warsaw"
+
+
 @pytest.fixture(scope="session")
 def base_url():
     return os.getenv("BASE_URL", DEFAULT_BASE_URL).rstrip("/")

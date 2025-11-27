@@ -37,15 +37,11 @@ jobs:
         run: |
           pytest -m "not registration"
 
-      - name: Install Allure
-        run: |
-          npm install -g allure-commandline --save-dev
-
       - name: Generate Allure report
         if: always()
         continue-on-error: true
         run: |
-          allure generate allure-results -o allure-report --clean
+          npx allure generate allure-results -o allure-report --clean
 
       - name: Upload artifact for Pages
         if: always() && success()

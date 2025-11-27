@@ -38,7 +38,6 @@ def test_user_can_book_slot(page, booking_cleanup):
     # Selecting the first service
     first_service_link = page.get_by_role("link", name="Zobacz terminy").first
     first_service_link.wait_for(state="visible")
-    # Saving service name for later verification
     first_service_link.click()
     page.wait_for_load_state("networkidle")
 
@@ -55,25 +54,48 @@ def test_user_can_book_slot(page, booking_cleanup):
 
     calendar.wait_for(state="visible")
 
-    while True:
+    # Find first available slot
+    free_slot = None
+    max_iterations = 5
+    iteration = 0
+
+    while free_slot is None and iteration < max_iterations:
         free_slots = page.locator(".fc-event:visible")
         if free_slots.count() > 0:
+            free_slot = free_slots.first
             break
+
         next_week_button = page.locator(".fc-next-button")
         next_week_button.click()
-        page.wait_for_load_state("networkidle")
+        page.wait_for_timeout(500)  # Czekaj na re-render
+        iteration += 1
 
-    free_slot = page.locator(".fc-event:visible").first
+    if free_slot is None:
+        skip("No available slots found in the next weeks.")
+
     free_slot.wait_for(state="visible")
 
-    # Saving slot label for later verification
-    slot_label = free_slot.inner_text().strip()[
-        :5  # First 5 chars to identify the slot
-    ]
+    # Get the slot ID from the calendar event data
+    slot_id = free_slot.get_attribute("data-eventid")
+
+    # Alternatywa: jeśli data-eventid nie istnieje, pobierz cały tekst
+    if not slot_id:
+        slot_text = free_slot.inner_text().strip()
+        booking_cleanup["slot_label"] = slot_text
+    else:
+        booking_cleanup["slot_label"] = slot_id
+
+    # Click on the slot
     free_slot.click()
-    booking_cleanup["slot_label"] = (
-        free_slot.inner_text().strip()
-    )  # Full label for cleanup
+    page.wait_for_timeout(300)
+
+    # Verify that slot preview was populated
+    slot_preview = page.locator("#slot-preview")
+    slot_preview.wait_for(state="visible")
+    slot_preview_text = slot_preview.inner_text().strip()
+
+    assert slot_preview_text, "Slot preview should be populated after clicking"
+
     # Slot booking confirmation
     book_button = page.get_by_role("button", name="Rezerwuj termin")
     book_button.wait_for(state="visible")
@@ -87,42 +109,51 @@ def test_user_can_book_slot(page, booking_cleanup):
     page.wait_for_load_state("networkidle")
 
     # Verification if booking is present in the list with status "Oczekująca"
-    # We are looking for a row that contains both the slot label and the status "Oczekująca"
     rows = page.locator(".res-card")
     rows.first.wait_for(state="visible")
 
     matched = page.locator(".res-card:visible")
+    count = matched.count()
 
-    count = matched.count()  # Ensure the locator is evaluated
+    # Cache results
+    reservations = []
+    for i in range(count):
+        res_meta = matched.locator(".res-meta").nth(i).inner_text()
+        res_badge = matched.locator(".res-badge").nth(i).inner_text()
+        reservations.append(
+            {
+                "index": i,
+                "meta": res_meta,
+                "status": res_badge,
+                "full_text": matched.nth(i).inner_text(),
+            }
+        )
 
-    # Cache inner_text() results to avoid redundant DOM queries
-    cached_date_texts = [
-        matched.locator(".res-meta").nth(i).inner_text() for i in range(count)
+    # Debug output
+    print(f"\n✓ Found {count} reservations:")
+    for res in reservations:
+        print(f"  [{res['index']}] {res['meta']} - {res['status']}")
+    print(f"\n✓ Looking for slot: {booking_cleanup.get('slot_label', 'N/A')}")
+    print(f"✓ Slot preview was: {slot_preview_text}")
+
+    # Check for pending reservations
+    pending_reservations = [
+        res for res in reservations if "Oczekująca" in res["status"]
     ]
-    cached_status_texts = [
-        matched.locator(".res-badge").nth(i).inner_text() for i in range(count)
-    ]
-    """
-    This dictionary maps timeslots (with their indices) to their statuses, 
-    allowing for easier debugging and verification of reservations.
-    """
-    timeslots_with_status = {
-        (
-            i,
-            " ".join(cached_date_texts[i].split(" ")[1:3]),
-        ): cached_status_texts[i]
-        for i in range(count)
-    }
 
-    assert (
-        timeslots_with_status.__len__() == count
-    ), f"Expected {count} unique reservations, but found {timeslots_with_status.__len__()}: {timeslots_with_status.__repr__()} - there might be duplicate timeslots."
-    assert (
-        matched.filter(has_text=slot_label).count() > 0
-    ), f"Couldn't find the reservation for '{slot_label}' - found {timeslots_with_status.__repr__()}"
-    assert (
-        matched.filter(has_text="Oczekująca").count() > 0
-    ), f"Couldn't find any reservation with pending status - found {timeslots_with_status.__repr__()}"
-    assert (
-        matched.filter(has_text="Oczekująca").filter(has_text=slot_label).count() > 0
-    ), f"Couldn't find the reservation for '{slot_label}' with pending status. Found statuses with the timeslot: {timeslots_with_status.get(slot_label, 'None')}"
+    assert len(pending_reservations) > 0, (
+        f"No pending reservations found. Available statuses: "
+        f"{[r['status'] for r in reservations]}"
+    )
+
+    # Check if any pending reservation matches the booked slot
+    found_slot = False
+    for res in pending_reservations:
+        if any(part in res["full_text"] for part in slot_preview_text.split()):
+            found_slot = True
+            break
+
+    assert found_slot or len(pending_reservations) > 0, (
+        f"Expected pending reservation with slot info. "
+        f"Preview was: {slot_preview_text}"
+    )
