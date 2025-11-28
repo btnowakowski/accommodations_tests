@@ -1,31 +1,32 @@
 import os
 from datetime import datetime, timedelta
 import pytest
+from tests.data import ADMIN_PANEL, TEST_SERVICE
+from tests.helpers.admin import (
+    login_admin,
+    is_logged_in_admin,
+    is_admin_panel_url,
+    get_service_heading,
+    navigate_to_dashboard,
+    navigate_to_slots,
+    create_service,
+    create_slot,
+)
 
 
 @pytest.fixture
 def admin_page(page, base_url):
-    """Login to admin panel."""
-    page.goto(f"{base_url}/admin-panel/")
+    """Login to admin panel. Returns page."""
+    page.goto(f"{base_url}{ADMIN_PANEL.admin_panel_url_suffix}")
     page.wait_for_load_state("domcontentloaded", timeout=15000)
 
-    current_url = page.url
+    if is_admin_panel_url(page) and is_logged_in_admin(page):
+        return page
 
-    if "/admin-panel/" in current_url:
-        page.wait_for_load_state("networkidle")
-        stat_cards = page.locator(".stat-card")
-        if stat_cards.count() > 0:
-            return page
-
-    login_form = page.locator("input[name='username']").first
-
+    login_form = page.locator(ADMIN_PANEL.username_input_selector).first
     if login_form.is_visible():
         try:
-            page.fill("input[name='username']", os.getenv("ADMIN_EMAIL"))
-            page.fill("input[type='password']", os.getenv("ADMIN_PASSWORD"))
-            page.get_by_role("button", name="Zaloguj").click()
-            page.wait_for_url("**/admin-panel/**", timeout=15000)
-            page.wait_for_load_state("networkidle")
+            login_admin(page, os.getenv("ADMIN_EMAIL"), os.getenv("ADMIN_PASSWORD"))
         except Exception:
             page.screenshot(path="debug_admin_login_failed.png")
             raise
@@ -34,46 +35,39 @@ def admin_page(page, base_url):
 
 
 @pytest.fixture
-def admin_with_test_service(admin_page):
-    """Ensure a test service exists."""
+def admin_page_with_test_service(admin_page):
+    """Ensure a test service exists. Returns page."""
     admin_page.goto(admin_page.url + "services/")
-    test_service = admin_page.locator("h3", has_text="Test Service").first
+    test_service = get_service_heading(admin_page, TEST_SERVICE.name)
 
     if not test_service.is_visible():
-        admin_page.get_by_role("link", name="Dodaj usługę").click()
-        admin_page.wait_for_load_state("networkidle")
-        admin_page.fill("#id_name", "Test Service")
-        admin_page.fill("#id_description", "Service for testing purposes")
-        admin_page.fill("#id_price", "50")
-        admin_page.fill("#id_slot_duration", "90")
-        admin_page.get_by_role("button", name="Zapisz").click()
+        create_service(
+            admin_page,
+            TEST_SERVICE.name,
+            TEST_SERVICE.description,
+            TEST_SERVICE.price,
+            TEST_SERVICE.duration,
+        )
 
     return admin_page
 
 
 @pytest.fixture
-def admin_with_test_slots(admin_with_test_service):
-    """Admin page with at least two slots in Test Service."""
-    admin_page = admin_with_test_service
-    admin_page.get_by_role("link", name="Dashboard").first.click()
-    admin_page.get_by_role("link", name="Terminy").first.click()
+def admin_page_with_test_slots(admin_page_with_test_service):
+    """Admin page with at least two slots in Test Service. Returns page."""
+    admin_page = admin_page_with_test_service
+    navigate_to_dashboard(admin_page)
+    navigate_to_slots(admin_page)
 
-    slots = admin_page.locator("td", has_text="Test Service")
+    slots = admin_page.locator("td", has_text=TEST_SERVICE.name)
     while slots.count() < 2:
-        add_slot_btn = admin_page.get_by_role("link", name="+ Dodaj termin")
-        add_slot_btn.click()
-        admin_page.wait_for_load_state("networkidle")
-
         tomorrow = datetime.now() + timedelta(days=1)
         options = admin_page.eval_on_selector_all(
-            "#id_service_select option", "opts => opts.map(o => o.value)"
+            f"{ADMIN_PANEL.slot_service_select} option",
+            "opts => opts.map(o => o.value)",
         )
         last_value = options[-1]
-        admin_page.select_option("#id_service_select", value=last_value)
-        admin_page.fill("#id_slot_date", tomorrow.strftime("%Y-%m-%d"))
-        admin_page.wait_for_timeout(500)
-        admin_page.select_option("#id_slots_select", index=2)
-        admin_page.get_by_role("button", name="Zapisz").click()
-        admin_page.wait_for_load_state("networkidle")
+        create_slot(admin_page, last_value, tomorrow.strftime("%Y-%m-%d"))
+        slots = admin_page.locator("td", has_text=TEST_SERVICE.name)
 
     return admin_page

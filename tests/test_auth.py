@@ -1,49 +1,25 @@
-import time
-import random
-import string
 from pytest import mark
-
-
-def random_email():
-    stamp = int(time.time())
-    rand = "".join(random.choices(string.ascii_lowercase, k=5))
-    return f"test_{rand}_{stamp}@example.com"
+from tests.data import generate_test_user
+from tests.helpers.auth import register_user, login_user, logout_user, is_user_logged_in
 
 
 @mark.registration
-def test_registration_and_login(page):
-    email = random_email()
-    password = "Test1234!abcd"
-    username = email.split("@")[0]
+def test_user_registration(page):
+    """Test that new user can register and is automatically logged in."""
+    user = generate_test_user()
 
-    # Registration flow
-    page.goto("/")
-    page.get_by_role("link", name="Rejestracja").click()
+    register_user(page, user.username, user.email, user.password)
 
-    page.locator("input[name='username']").fill(username)
+    assert is_user_logged_in(page)
 
-    page.get_by_label("Email").fill(email)
 
-    page.locator("input[name='password1']").fill(password)
-    page.locator("input[name='password2']").fill(password)
+@mark.registration
+def test_user_login_after_registration(page):
+    """Test that registered user can log out and log back in."""
+    user = generate_test_user()
 
-    page.get_by_role("button", name="Załóż konto").click()
+    register_user(page, user.username, user.email, user.password)
+    logout_user(page)
+    login_user(page, user.username, user.password)
 
-    page.wait_for_load_state("networkidle")
-
-    # Verify successful registration and automatic login
-    assert page.get_by_role("link", name="Moje rezerwacje").is_visible()
-
-    page.get_by_role("button", name="Wyloguj").click()
-
-    # Login flow
-    page.get_by_role("link", name="Zaloguj").click()
-
-    page.locator("input[name='username']").fill(username)
-    page.get_by_label("Hasło").fill(password)
-    page.get_by_role("button", name="Zaloguj").click()
-
-    page.wait_for_load_state("networkidle")
-
-    # Verify successful login
-    assert page.get_by_role("link", name="Moje rezerwacje").is_visible()
+    assert is_user_logged_in(page)

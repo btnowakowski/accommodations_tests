@@ -21,7 +21,7 @@ def booking_cleanup(page):
 
 
 @pytest.fixture
-def booked_slot(page, logged_in_user, booking_cleanup):
+def booked_slot_info(page, logged_in_user, booking_cleanup):
     """Fixture: prepare a booked slot. Returns dict with booking info."""
     navigate_to_services(page)
     select_first_service(page)

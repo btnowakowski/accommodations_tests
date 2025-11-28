@@ -1,16 +1,18 @@
+import re
+from playwright.sync_api import expect
+from tests.data import HOMEPAGE
+from tests.helpers import home
+
+
 def test_homepage_loads(page):
-    page.goto("/")  # używa base_url z contextu
+    page.goto("/")
 
     # Title check
-    assert "Booking" in page.title()
+    expect(page).to_have_title(re.compile(HOMEPAGE.title_contains))
 
     # Navigation bar links
-    page.get_by_role("link", name="Usługi").wait_for()
-    page.get_by_role("link", name="Zaloguj").wait_for()
-    page.get_by_role("link", name="Rejestracja").wait_for()
+    for link in home.get_nav_links(page):
+        expect(link).to_be_visible()
 
     # Main header / hero section
-    hero = page.get_by_role(
-        "heading", name="Wybierz usługę. Zarezerwuj termin. Gotowe."
-    )
-    assert hero.is_visible()
+    expect(home.get_hero_heading(page)).to_be_visible()
